@@ -1,8 +1,12 @@
-import React, { useRef } from 'react';
-import { View, Dimensions } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Dimensions, Text, Alert, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import CodePush from '@chlee1001/react-native-code-push';
+import Snackbar from '@/components/snackbar';
+
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedProps,
@@ -26,23 +30,9 @@ import { useScrollToTop } from '@react-navigation/native';
 import { useVisionOS } from '@/hooks/useVisionOS';
 import { VisionContainer, HoverableView } from '@/components/ui/VisionContainer';
 
-// const FEATURED_MOVIE = {
-//   id: 'dont-move',
-//   title: "Don't Move",
-//   thumbnail: 'https://i.redd.it/q53e4iwud0971.jpg',
-//   categories: ['Violent', 'Gritty', 'Thriller', 'Drug Lord']
-// };
-const FEATURED_MOVIE = {
-  id: 'dont-move',
-  title: "Don't Move",
-  thumbnail: 'https://occ-0-8407-2219.1.nflxso.net/dnm/api/v6/E8vDc_W8CLv7-yMQu8KMEC7Rrr8/AAAABWsjI5VID3ChnY1bGlkeXfdS0qY19EszZmC9vOQjb72s7hyKAfD-5Yy1OAceR9CfLqyxRMWPu15X6_zAf5ELM4gLbXcJL_2B2e8E.jpg?r=bb0',
-  categories: ['Soapy', 'Suspensful', 'Sci-Fi Mystery'],
-  logo: 'https://occ-0-8407-2219.1.nflxso.net/dnm/api/v6/tx1O544a9T7n8Z_G12qaboulQQE/AAAABeTZx41tm9x0TT2G_c3gmJOoK_1n9hhvRhzE76D5f3vwwNaWOEBJDLRl5mU1R3BVXhYYU_okqrGzn_qM-3nUJNqUK8QAETNIh4RZy2M7V7726S4tlW3gvd6KtIF_utcjO714L4rQ7ib3sM2ZhnDLF111_nkdewygq9av5vHduwqf1MgPoP5NIQ.png?r=867'
-};
-
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function HomeScreen() {
+function HomeContent() {
   const { movies } = movieData as MoviesData;
   const insets = useSafeAreaInsets();
   const { tiltX, tiltY } = useDeviceMotion();
@@ -172,4 +162,55 @@ export default function HomeScreen() {
   );
 }
 
+const App: React.FC = () => {
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
 
+  useEffect(() => {
+    CodePush.sync(
+      {
+        installMode: CodePush.InstallMode.ON_NEXT_RESTART,
+      },
+      (syncStatus) => {
+        if (syncStatus === CodePush.SyncStatus.UPDATE_INSTALLED) {
+          setSnackbarVisible(true);
+        }
+      }
+    );
+  }, []);
+
+  useEffect(() => {
+    const backAction = () => {
+      Alert.alert('알림', '앱 종료', [
+        {
+          text: '취소',
+          onPress: () => null,
+          style: 'cancel',
+        },
+        { text: '확인', onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction,
+    );
+    return () => backHandler.remove();
+  }, []);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <HomeContent />
+      <Snackbar
+        visible={snackbarVisible}
+        message="The app has been updated. Please restart to apply changes."
+        onDismiss={() => setSnackbarVisible(false)}
+        actionLabel="Restart"
+        onActionPress={() => CodePush.restartApp()}
+        autoHide={false}
+        swipeToDismiss
+      />
+    </View>
+  );
+};
+
+export default CodePush({ checkFrequency: CodePush.CheckFrequency.MANUAL })(App);
